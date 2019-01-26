@@ -3,7 +3,8 @@
 Adafruit_VL53L0X lox_right = Adafruit_VL53L0X();
 Adafruit_VL53L0X lox_left = Adafruit_VL53L0X();
 
-double offset = -8 ;
+double offset_1 = -40 ;
+double offset_2 = -0  ;
 
 void setup() {
   Serial.begin(115200);
@@ -42,8 +43,8 @@ void loop() {
   Serial.print("Reading a measurement... ");
   lox_right.rangingTest(&measure_right, false); // pass in 'true' to get debug data printout!
   lox_left.rangingTest(&measure_left, false); // pass in 'true' to get debug data printout!
-  int distance_right = measure_right.RangeMilliMeter + offset;
-  int distance_left = measure_left.RangeMilliMeter + offset;
+  int distance_right = measure_right.RangeMilliMeter + offset_1;
+  int distance_left = measure_left.RangeMilliMeter + offset_2;
 
   if (measure_right.RangeStatus != 4) {  // phase failures have incorrect data
     Serial.print("Right Distance (mm): "); Serial.println(distance_right);
