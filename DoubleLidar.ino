@@ -1,54 +1,77 @@
-#include "Adafruit_VL53L0X.h"
+#include "VL53L0X.h"
 #define PI 3.1415926535897932384626433832795
 
-Adafruit_VL53L0X lox_right = Adafruit_VL53L0X();
-Adafruit_VL53L0X lox_left = Adafruit_VL53L0X();
+VL53L0X lox_right = VL53L0X();
+VL53L0X lox_left = VL53L0X();
 
-double offset_1 = -40 ;
-double offset_2 = -0  ;
+#define OFFSET_RIGHT -40
+#define OFFSET_LEFT   0
+#define LIDAR_SEPERATION 265
+
+const String outOfRange = "Out of Range!";
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   // wait until serial port opens for native USB devices
   while (! Serial) {
     delay(1);
-  }
+  }  
 
-  pinMode(5, OUTPUT);
-  digitalWrite(5, LOW);
-  delay(10);
-  
-  Serial.println("Adafruit VL53L0X test");
-  if (!lox_right.begin(0x30)) {
-    Serial.println(F("Failed to boot right LIDAR"));
-    while(1);
-  }
-
-   digitalWrite(5, HIGH);
-   
-    Serial.println("Adafruit VL53L0X test");
-  if (!lox_left.begin()) {
-    Serial.println(F("Failed to boot left LIDAR"));
-    while(1);
-  }
-  // power 
-  Serial.println(F("VL53L0X API Simple Ranging example\n\n")); 
+  initializeLidarSystem();
 }
 
 
 void loop() {
-  VL53L0X_RangingMeasurementData_t measure_right;
-  VL53L0X_RangingMeasurementData_t measure_left;
+  double turn_angle = 0;
+
+  // Read the right lidar and store the success
+  int distance_right = lox_right.readRangeSingleMillimeters() + OFFSET_RIGHT;
+  bool rightReadSuccess = !lox_right.timeoutOccurred();
+
+  // Read the left lidar and store the success  
+  int distance_left  = lox_left.readRangeSingleMillimeters() + OFFSET_LEFT;
+  bool leftReadSuccess = !lox_left.timeoutOccurred();
+
+  // If both reads of the lidars were successful, calculate the angle to the target
+  if (rightReadSuccess && leftReadSuccess) {
+    turn_angle = calculateAngle(distance_right, distance_left);
+  }
+
+  serialPrintvalues(int distance_left, int distance_right, double turn_angle, bool leftReadSuccess, bool rightReadSuccess);
     
-  Serial.print("Reading a measurement... ");
-  lox_right.rangingTest(&measure_right, false); // pass in 'true' to get debug data printout!
-  lox_left.rangingTest(&measure_left, false); // pass in 'true' to get debug data printout!
-  int distance_right = measure_right.RangeMilliMeter + offset_1;
-  int distance_left = measure_left.RangeMilliMeter + offset_2;
-  double b = 265; //distance between lidars
-  double a = measure_right.RangeMilliMeter + offset_1;
-  double e = measure_left.RangeMilliMeter + offset_2;
+  delay(250);
+}
+
+bool initializeLidarSystem() {
+  bool returnVal;
+  
+  // disable the left lidar by setting pin 5 to low
+  pinMode(5, OUTPUT);
+  digitalWrite(5, LOW);
+  delay(10);
+  
+  // Initialize the right lidar and reset its address to 0x30
+  returnVal = lox_right.init();
+  lox_right.setAddress(0x30);
+
+  // enable the left lidar by setting pin 5 to high and initialize
+  digitalWrite(5, HIGH);
+  returnVal = returnVal && lox_left.init();
+
+  // lower the return signal rate limit (default is 0.25 MCPS)
+  lox_left.setSignalRateLimit(0.1);
+  lox_right.setSignalRateLimit(0.1);
+  
+  // increase laser pulse periods (defaults are 14 and 10 PCLKs)
+  lox_left.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+  lox_left.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+  lox_right.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+  lox_right.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+}
+
+double calculateAngle(double a, double e) {
+  double b = LIDAR_SEPERATION; //distance between lidars in mm
   double c = sqrt((pow(b,2)) + (pow(a,2)));
   double d = sqrt((pow(c,2)) + (pow(e,2)));
   double B = atan(b/a);
@@ -57,23 +80,27 @@ void loop() {
   double E = asin((e*sin(D))/(d));
   double F = (PI - E - B);
   double X = ((PI/2) - F);
-  double turn_angle = (X*(180/PI));
+  return (X*(180/PI));
+}
 
-  Serial.println("turn_angle");
-  Serial.println(turn_angle);
+void serialPrintvalues(int left, int right, double angle, bool leftSuccess, bool rightSuccess) {
+  // Print the left lidar value
+  Serial.print(F("left lidar mm:   ")); 
+  if (leftSuccess) 
+    { Serial.print(left); }
+  else 
+    { Serial.println(outOfRange); }
+
+  // Print the right lidar value
+  Serial.print(F("right lidar mm:  "));
+  if (rightSuccess) 
+    { Serial.print(right); }
+  else 
+    { Serial.println(outOfRange); }
   
-
-  if (measure_right.RangeStatus != 4) {  // phase failures have incorrect data
-    Serial.print("Right Distance (mm): "); Serial.println(distance_right);
-  } else {
-    Serial.println(" right out of range ");
+  // Print the angle if both lidar reads were successful
+  if (leftSuccess && rightSuccess) {
+    Serial.print(F("turn_angle:      "));
+    Serial.println(angle);
   }
-
-   if (measure_left.RangeStatus != 4) {  // phase failures have incorrect data
-    Serial.print("Left Distance (mm): "); Serial.println(distance_left);
-  } else {
-    Serial.println(" left out of range ");
-  }
-    
-  delay(250);
 }
