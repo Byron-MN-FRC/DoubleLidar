@@ -17,12 +17,15 @@ void setup() {
   while (! Serial) {
     delay(1);
   }  
-
+  Serial.println("initialize Lidar Start");
   initializeLidarSystem();
+  Serial.println("initialize Lidar Complete");
+
 }
 
 
 void loop() {
+  return;
   double turn_angle = 0;
 
   // Read the right lidar and store the success
@@ -38,7 +41,7 @@ void loop() {
     turn_angle = calculateAngle(distance_right, distance_left);
   }
 
-  serialPrintvalues(int distance_left, int distance_right, double turn_angle, bool leftReadSuccess, bool rightReadSuccess);
+  serialPrintvalues(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
     
   delay(250);
 }
@@ -50,11 +53,12 @@ bool initializeLidarSystem() {
   pinMode(5, OUTPUT);
   digitalWrite(5, LOW);
   delay(10);
-  
+
   // Initialize the right lidar and reset its address to 0x30
   returnVal = lox_right.init();
+  return;
   lox_right.setAddress(0x30);
-
+ 
   // enable the left lidar by setting pin 5 to high and initialize
   digitalWrite(5, HIGH);
   returnVal = returnVal && lox_left.init();
