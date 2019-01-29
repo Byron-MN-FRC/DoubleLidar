@@ -4,7 +4,7 @@
 VL53L0X lox_right = VL53L0X();
 VL53L0X lox_left = VL53L0X();
 
-#define OFFSET_RIGHT -40
+#define OFFSET_RIGHT -40 
 #define OFFSET_LEFT   0
 #define LIDAR_SEPERATION 265
 
