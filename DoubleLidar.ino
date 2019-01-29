@@ -6,9 +6,9 @@
 Adafruit_VL53L0X lox_right = Adafruit_VL53L0X();
 Adafruit_VL53L0X lox_left = Adafruit_VL53L0X();
 
-#define OFFSET_RIGHT -40 
-#define OFFSET_LEFT   0
-#define LIDAR_SEPERATION 265
+#define OFFSET_RIGHT -40.0 
+#define OFFSET_LEFT   0.0
+#define LIDAR_SEPERATION 265.0
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
