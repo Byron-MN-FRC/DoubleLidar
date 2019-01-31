@@ -3,6 +3,8 @@
         {
             "name": "Win32",
             "includePath": [
+                "C:\\Users\\heinz\\OneDrive\\Documents\\Arduino\\libraries\\**",    
+                "C:\\Program Files (x86)\\Arduino\\libraries\\**",
                 "C:\\Users\\heinz\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\**",
                 "C:\\Users\\heinz\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.6.23\\**"
             ],
