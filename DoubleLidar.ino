@@ -81,14 +81,14 @@ bool initializeLidarSystem() {
   returnVal = returnVal && lox_left.begin();
 }
 
-double calculateAngle(double a, double e) {
+double calculateAngle(double right, double left) {
   double b = LIDAR_SEPERATION; //distance between lidars in mm
-  double c = sqrt((pow(b,2)) + (pow(a,2)));
-  double d = sqrt((pow(c,2)) + (pow(e,2)));
-  double B = atan(b/a);
+  double c = sqrt((pow(b,2)) + (pow(right,2)));
+  double d = sqrt((pow(c,2)) + (pow(left,2)));
+  double B = atan(b/right);
   double A = ((PI/2) - B);
   double D = ((PI/2) - A);
-  double E = asin((e*sin(D))/(d));
+  double E = asin((left*sin(D))/(d));
   double F = (PI - E - B);
   double X = ((PI/2) - F);
   return (X*(180/PI));
