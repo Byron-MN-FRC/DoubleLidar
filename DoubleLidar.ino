@@ -23,22 +23,22 @@ EthernetServer server(80);
 const String outOfRange = "Out of Range!";
 
 void setup() {
-  Serial.begin(9600);
-  Wire.begin();
-
-
+  Wire.begin();        // Initialize the I2C library
+  Serial.begin(9600);  // Initialize the serial output for the arduino
+  
   // wait until serial port opens for native USB devices
-  while (! Serial) {
-    delay(1);
-  }  
+  while (! Serial) { delay(1);  }  
 
+  // Initialize the lidar system
+  Serial.println("calling initializeLidarSystem ");
+  bool lidarInitSuccess = initializeLidarSystem();
+  Serial.println("return from initializeLidarSystem ");
+  
   // Initialize the Ethernet server
   Ethernet.begin(mac, ip);
   server.begin();
   Serial.print("server is at ");
   Serial.println(Ethernet.localIP());
-
-  initializeLidarSystem();
 }
 
 void loop() {
@@ -48,21 +48,25 @@ void loop() {
   bool leftReadSuccess;
   bool rightReadSuccess;
 
-  calculateDistanceAndAngle(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
+    
+  // See if we have a client knocking at the door
   EthernetClient client = server.available();
   if (client) {
+    // Read the lidars and calculate the angle necessary to turn the robot to approach the target
+    calculateDistanceAndAngle(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
+    serialPrintvalues(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
+
+    //Read in the data being passed to us.  (Might be useful later on)
     readClientData(client);
+
+    // Write the data from the lidars back to the client.
     writeToClient(client, distance_left, distance_right, turn_angle);
-    // give the web browser time to receive the data
-    delay(1);
+
     // close the connection:
     client.stop();
   }
-
-  serialPrintvalues(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
-    
-  delay(250);
 }
+
 
 void writeToClient(EthernetClient client, int left, int right, double angle) {
   client.println("HTTP/1.1 200 OK");
@@ -76,7 +80,9 @@ void writeToClient(EthernetClient client, int left, int right, double angle) {
   client.print(right); client.print(',');
   client.print(angle);
   client.print("]]]");
-  client.println("</html>");
+  client.println("</html>");    
+  // give the web browser time to receive the data
+  delay(5);
 }
 
 void readClientData(EthernetClient client) {
@@ -89,21 +95,25 @@ void readClientData(EthernetClient client) {
   }
 }
 
+
 bool initializeLidarSystem() {
   bool returnVal;
   
   // disable the left lidar by setting pin 5 to low
-  pinMode(5, OUTPUT);
+  pinMode(8, OUTPUT);
+  Serial.print("Alpha ");
 
   // Initialize the right lidar and reset its address to 0x30
   //returnVal = lox_right.begin(0x30);
   lox_right.setAddress(0x42);
   returnVal = lox_right.init();
+  Serial.print("Beta ");
 
   // enable the left lidar by setting pinmode on pin 5 to INPUT and initialize
-  pinMode(5, INPUT);
+  pinMode(8, INPUT);
   delay(10);
   returnVal = returnVal && lox_left.init();
+  Serial.print("Gamma ");
 
   lox_left.setTimeout(500);
   lox_right.setTimeout(500);
@@ -125,14 +135,14 @@ double calculateAngle(double right, double left) {
 }
 
 bool calculateDistanceAndAngle(int &left, int &right, double &turn_angle, bool &leftReadSuccess, bool &rightReadSuccess) {
-  turn_angle = 0;
+   turn_angle = 0;
   // Read the right lidar and store the success
   right = lox_right.readRangeSingleMillimeters() + OFFSET_RIGHT;
-  rightReadSuccess = true; //measure_right.RangeStatus != 4;
+  rightReadSuccess = ((right > 0) && (right < 8100));
 
   // Read the left lidar and store the success  
   left  = lox_left.readRangeSingleMillimeters();
-  leftReadSuccess = true; //measure_left.RangeStatus != 4;
+  leftReadSuccess = ((left > 0) && (left < 8100));
 
   // If both reads of the lidars were successful, calculate the angle to the target
   if (rightReadSuccess && leftReadSuccess) {
