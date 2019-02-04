@@ -1,11 +1,12 @@
 #include <Wire.h>
 #include <VL53L0X.h>
 #include <Ethernet.h>
+#include <Adafruit_SleepyDog.h>
 
 #define PI 3.1415926535897932384626433832795
 #define OFFSET_RIGHT -15.0
 #define OFFSET_LEFT -10.0
-#define LIDAR_SEPERATION 265.0
+#define LIDAR_SEPERATION 700.0
 
 VL53L0X lox_right;
 VL53L0X lox_left;
@@ -21,8 +22,6 @@ IPAddress ip(10, 48, 59, 17);
 EthernetServer server(80);
 
 const String outOfRange = "Out of Range!";
-
-void(* resetFunc) (void) = 0;//declare reset function at address 0
 
 void setup() {
   Wire.begin();        // Initialize the I2C library
@@ -55,8 +54,12 @@ void loop() {
   EthernetClient client = server.available();
   if (client) {
     // Read the lidars and calculate the angle necessary to turn the robot to approach the target
-    calculateDistanceAndAngle(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
-    serialPrintvalues(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
+    if (!calculateDistanceAndAngle(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess)) {
+      serialPrintvalues(distance_left, distance_right, turn_angle, leftReadSuccess, rightReadSuccess);
+      //distance_left = 0; 
+      //distance_right = 0; 
+      turn_angle =0;
+    }
 
     //Read in the data being passed to us.  (Might be useful later on)
     readClientData(client);
@@ -86,6 +89,7 @@ void writeToClient(EthernetClient client, int left, int right, double angle) {
   // give the web browser time to receive the data
   delay(5);
 }
+
 void writeResetToClient(EthernetClient client) {
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
@@ -106,17 +110,18 @@ void readClientData(EthernetClient client) {
     if (len > 80) len = 80;
     client.read(buffer, len);
     String strbuffer = buffer;
+    
+    // Here is where we are resetting the Arduino if requested by the website.
     if(strbuffer.indexOf("reset") != -1) {    
       // Write the data from the lidars back to the client.
       writeResetToClient(client);
 
-    // close the connection:
+      // close the connection:
       client.stop();
 
-      resetFunc();  //call reset
-      //Serial.println("hello world");
+      // Reset the Arduino.
+      Watchdog.reset();
     }
-    Serial.print(strbuffer); // show in the serial monitor (slows some boards)
   }
 }
 
@@ -139,15 +144,6 @@ bool initializeLidarSystem() {
 
   lox_left.setTimeout(500);
   lox_right.setTimeout(500);
-
-  //lox_left.setSignalRateLimit(0.1);
-  //lox_right.setSignalRateLimit(0.1);
-  //lox_left.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-  //lox_left.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-  //lox_right.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-  //lox_right.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-  //lox_left.setMeasurementTimingBudget(200000);
-  //lox_right.setMeasurementTimingBudget(200000);
 }
 
 double calculateAngle(double right, double left) {
