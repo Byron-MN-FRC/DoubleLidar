@@ -3,8 +3,8 @@
 #include <Ethernet.h>
 
 #define PI 3.1415926535897932384626433832795
-#define OFFSET_RIGHT -40.0 
-#define OFFSET_LEFT   0.0
+#define OFFSET_RIGHT -15.0
+#define OFFSET_LEFT -10.0
 #define LIDAR_SEPERATION 265.0
 
 VL53L0X lox_right;
@@ -21,6 +21,8 @@ IPAddress ip(10, 48, 59, 17);
 EthernetServer server(80);
 
 const String outOfRange = "Out of Range!";
+
+void(* resetFunc) (void) = 0;//declare reset function at address 0
 
 void setup() {
   Wire.begin();        // Initialize the I2C library
@@ -84,6 +86,18 @@ void writeToClient(EthernetClient client, int left, int right, double angle) {
   // give the web browser time to receive the data
   delay(5);
 }
+void writeResetToClient(EthernetClient client) {
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println("Connection: close");  // the connection will be closed after completion of the response
+  client.println();
+  client.println("<!DOCTYPE HTML>");
+  client.println("<html>");
+  client.print("Reset");
+  client.println("</html>");    
+  // give the web browser time to receive the data
+  delay(5);
+}
 
 void readClientData(EthernetClient client) {
   int len = client.available();
@@ -91,7 +105,18 @@ void readClientData(EthernetClient client) {
     byte buffer[80];
     if (len > 80) len = 80;
     client.read(buffer, len);
-    Serial.write(buffer, len); // show in the serial monitor (slows some boards)
+    String strbuffer = buffer;
+    if(strbuffer.indexOf("reset") != -1) {    
+      // Write the data from the lidars back to the client.
+      writeResetToClient(client);
+
+    // close the connection:
+      client.stop();
+
+      resetFunc();  //call reset
+      //Serial.println("hello world");
+    }
+    Serial.print(strbuffer); // show in the serial monitor (slows some boards)
   }
 }
 
@@ -101,37 +126,38 @@ bool initializeLidarSystem() {
   
   // disable the left lidar by setting pin 5 to low
   pinMode(8, OUTPUT);
-  Serial.print("Alpha ");
 
   // Initialize the right lidar and reset its address to 0x30
   //returnVal = lox_right.begin(0x30);
   lox_right.setAddress(0x42);
   returnVal = lox_right.init();
-  Serial.print("Beta ");
-
+ 
   // enable the left lidar by setting pinmode on pin 5 to INPUT and initialize
   pinMode(8, INPUT);
   delay(10);
   returnVal = returnVal && lox_left.init();
-  Serial.print("Gamma ");
 
   lox_left.setTimeout(500);
   lox_right.setTimeout(500);
 
-  return returnVal;
+  //lox_left.setSignalRateLimit(0.1);
+  //lox_right.setSignalRateLimit(0.1);
+  //lox_left.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+  //lox_left.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+  //lox_right.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+  //lox_right.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+  //lox_left.setMeasurementTimingBudget(200000);
+  //lox_right.setMeasurementTimingBudget(200000);
 }
 
 double calculateAngle(double right, double left) {
   double b = LIDAR_SEPERATION; //distance between lidars in mm
-  double c = sqrt((pow(b,2)) + (pow(right,2)));
-  double d = sqrt((pow(c,2)) + (pow(left,2)));
-  double B = atan(b/right);
-  double A = ((PI/2) - B);
-  double D = ((PI/2) - A);
-  double E = asin((left*sin(D))/(d));
-  double F = (PI - E - B);
-  double X = ((PI/2) - F);
-  return (X*(180/PI));
+  double a = right;
+  double e = left;
+  double dif = (a - e);
+  double X = atan(dif/LIDAR_SEPERATION);
+  double turn_angle = X*(180/PI);
+  return (turn_angle);
 }
 
 bool calculateDistanceAndAngle(int &left, int &right, double &turn_angle, bool &leftReadSuccess, bool &rightReadSuccess) {
@@ -141,7 +167,7 @@ bool calculateDistanceAndAngle(int &left, int &right, double &turn_angle, bool &
   rightReadSuccess = ((right > 0) && (right < 8100));
 
   // Read the left lidar and store the success  
-  left  = lox_left.readRangeSingleMillimeters();
+  left  = lox_left.readRangeSingleMillimeters() + OFFSET_LEFT;
   leftReadSuccess = ((left > 0) && (left < 8100));
 
   // If both reads of the lidars were successful, calculate the angle to the target
